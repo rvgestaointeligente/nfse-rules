@@ -1,0 +1,53 @@
+name: Vigia LC116/NBS — Sistema Nacional NFS-e (gov.br)
+
+on:
+  schedule:
+    - cron: "30 12 * * *"   # 12h30 UTC = 9h30 BRT, todo dia
+  workflow_dispatch:         # permite rodar manualmente pelo GitHub
+
+permissions:
+  contents: write            # necessário para o bot dar git push (era read-only)
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Rodar Vigia LC116/NBS
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python agents/vigia_lc116.py
+
+      - name: Salvar estado (somente o arquivo de controle — NUNCA a tabela em si)
+        run: |
+          git config user.name  "RV Emissor NFS-e Bot"
+          git config user.email "bot@rvgestaointeligente.com.br"
+          git add agents/ultimo_anexo_b.json
+          if git diff --staged --quiet; then
+            echo "Nada novo para salvar."
+          else
+            git commit -m "chore: atualiza estado vigia LC116/NBS [bot]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Avisar no Telegram se a rodada falhou
+        if: failure()
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=⚠️ Workflow '${{ github.workflow }}' FALHOU. Verifique: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
