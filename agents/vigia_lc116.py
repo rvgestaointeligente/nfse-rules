@@ -30,7 +30,11 @@ a ser obrigatórios nas notas — tabela desatualizada pode virar multa pro
 cliente do RV Emissor NFS-e.
 """
 import json, os, re, sys, urllib.request
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# GitHub Actions roda em UTC — converte pro horário de Brasília (UTC-3, sem
+# horário de verão desde 2019) só pra exibição nas mensagens do Telegram.
+_BRT = timezone(timedelta(hours=-3))
 
 # ─── Caminhos ──────────────────────────────────────────────────────────────────
 _AGENTS = os.path.dirname(os.path.abspath(__file__))
@@ -73,7 +77,7 @@ def _salvar_estado(estado: dict):
 
 
 def verificar():
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    agora = datetime.now(_BRT).strftime("%d/%m/%Y %H:%M")
     print(f"\n{'='*60}")
     print(f"  Vigia LC116/NBS (gov.br/nfse) — {agora}")
     print(f"{'='*60}\n")
